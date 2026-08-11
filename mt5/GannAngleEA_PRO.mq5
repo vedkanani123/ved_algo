@@ -17,7 +17,7 @@
 //| - Break-even protection & daily trend/regime filters             |
 //+------------------------------------------------------------------+
 #property copyright "Gann PRO"
-#property version   "2.21"
+#property version   "2.22"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -151,7 +151,7 @@ bool InitializeStrategy()
 //--------------------------------------------------------------------
 int OnInit()
   {
-   PrintFormat("Gann PRO v2.21 initialized (%s mode)", IsTesterMode() ? "tester" : "live");
+   PrintFormat("Gann PRO v2.22 initialized (%s mode)", IsTesterMode() ? "tester" : "live");
    if(!IsTesterMode())
      {
       if(!LicenseVerify())
@@ -262,7 +262,7 @@ bool LicenseVerify()
       return false;
      }
 
-   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.21\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
+   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.22\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
                               account, device, nonce, (long)InpMagicNumber, AccountInfoDouble(ACCOUNT_BALANCE),
                               AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_MARGIN_FREE),
                               PositionsTotal(), DealsToday(), _Symbol, AccountInfoString(ACCOUNT_COMPANY));
