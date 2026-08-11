@@ -10,3 +10,4 @@ node_modules/
 coverage/
 tsconfig.tsbuildinfo
 supabase/.temp/
+.vercel/
