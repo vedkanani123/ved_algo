@@ -119,12 +119,20 @@ int      g_licenseGraceSecs  = 12 * 60 * 60;
 
 int g_dailyBias = 0;
 
+bool IsTesterMode()
+  {
+   return MQLInfoInteger(MQL_TESTER) ||
+          MQLInfoInteger(MQL_OPTIMIZATION) ||
+          MQLInfoInteger(MQL_FORWARD);
+  }
+
 //--------------------------------------------------------------------
 // INIT
 //--------------------------------------------------------------------
 int OnInit()
   {
-   if(!MQLInfoInteger(MQL_TESTER))
+   PrintFormat("Gann PRO v2.21 initialized (%s mode)", IsTesterMode() ? "tester" : "live");
+   if(!IsTesterMode())
      {
       if(!LicenseVerify())
          Print("Gann PRO: waiting for live license authorization. Add https://ved-algo.vercel.app to MT5 WebRequest allowed URLs; the EA will retry automatically.");
@@ -159,7 +167,7 @@ int OnInit()
 //--------------------------------------------------------------------
 void OnTick()
   {
-   if(!MQLInfoInteger(MQL_TESTER) && !LicenseCanTrade())
+   if(!IsTesterMode() && !LicenseCanTrade())
      {
       // Never open new trades without current authorization. Existing positions are left untouched
       // so that a license/network change cannot unexpectedly close a customer's market exposure.
@@ -195,7 +203,7 @@ void OnTick()
 //--------------------------------------------------------------------
 void OnTimer()
   {
-   if(MQLInfoInteger(MQL_TESTER)) return;
+   if(IsTesterMode()) return;
    // Retry every minute until the chart is authorized (for example while the
    // owner is adding the WebRequest origin), then use the normal heartbeat.
    int interval = g_licenseAuthorized ? LICENSE_HEARTBEAT_MINUTES * 60 : 60;
@@ -218,6 +226,11 @@ bool LicenseCanTrade()
 
 bool LicenseVerify()
   {
+   if(IsTesterMode())
+     {
+      g_licenseAuthorized = true;
+      return true;
+     }
    g_licenseLastCheck = TimeCurrent();
    string device = BuildDeviceFingerprint();
    long account  = AccountInfoInteger(ACCOUNT_LOGIN);
