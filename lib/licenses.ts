@@ -37,10 +37,18 @@ export function generateLicenseKey() {
   return `${LICENSE_PREFIX}-${chunks.join("-")}`;
 }
 
+export function generateActivationMagic() {
+  const max = 9000000000000000n;
+  let value = randomBytes(8).readBigUInt64BE() % (max - 1000000000000000n);
+  value += 1000000000000000n;
+  return value.toString();
+}
+
 export type IssueLicenseInput = { label: string; expiresAt: string; allowedAccount?: string | null; createdBy: string };
 
 export async function issueLicense(input: IssueLicenseInput) {
   const licenseKey = generateLicenseKey();
+  const activationMagic = generateActivationMagic();
   const admin = createAdminClient();
   const { data, error } = await admin.from("ea_licenses").insert({
     customer_label: input.label,
@@ -49,9 +57,10 @@ export async function issueLicense(input: IssueLicenseInput) {
     max_devices: 1,
     key_fingerprint: fingerprint(licenseKey),
     key_ciphertext: encrypt(licenseKey),
+    activation_magic: activationMagic,
     status: "active",
     created_by: input.createdBy
-  }).select("id, customer_label, expires_at, status, created_at").single();
+  }).select("id, customer_label, expires_at, status, activation_magic, created_at").single();
   if (error) throw error;
   await audit(input.createdBy, data.id, "license.created", { label: input.label, expiresAt: input.expiresAt });
   return { ...data, licenseKey };
@@ -93,6 +102,7 @@ export type RecentHeartbeat = {
   device_fingerprint: string;
   ea_version: string;
   telemetry: {
+    magicNumber?: number;
     balance?: number;
     equity?: number;
     freeMargin?: number;
@@ -189,7 +199,7 @@ export async function deleteLicense(actorId: string, id: string) {
   return { id };
 }
 
-export function setFile({ licenseKey, apiUrl }: { licenseKey: string; apiUrl: string }) {
+export function setFile({ licenseKey, apiUrl, activationMagic }: { licenseKey: string; apiUrl: string; activationMagic: string | number | bigint }) {
   // The EA deliberately has no license input: anything in an MT5 .set file is readable by
   // its recipient. The server binds the license record to the account and terminal fingerprint.
   // Keep the legacy licenseKey argument for route compatibility, but never serialize it.
@@ -197,8 +207,8 @@ export function setFile({ licenseKey, apiUrl }: { licenseKey: string; apiUrl: st
   return [
     "; Gann PRO account-bound activation package",
     "; This file contains no license secret. The only EA input is InpMagicNumber.",
-    "InpMagicNumber=888123",
+    `InpMagicNumber=${activationMagic}`,
     `; WebRequest endpoint: ${apiUrl}`,
-    "; The owner must bind this license to the recipient's MT5 account in the dashboard."
+    "; If the account was blank at issue, the first valid EA heartbeat binds it automatically."
   ].join("\r\n");
 }

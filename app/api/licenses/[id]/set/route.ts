@@ -9,7 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     await requireOwnerApi();
     const { id } = await params;
     const license = await getLicense(id);
-    const file = setFile({ licenseKey: license.licenseKey, apiUrl: `${serverEnv().APP_ORIGIN}/api/ea/validate` });
+    const file = setFile({ licenseKey: license.licenseKey, activationMagic: license.activation_magic, apiUrl: `${serverEnv().APP_ORIGIN}/api/ea/validate` });
     return new NextResponse(file, { headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Content-Disposition": `attachment; filename="gann-pro-${id}.set"`,

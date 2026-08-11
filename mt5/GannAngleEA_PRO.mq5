@@ -228,8 +228,8 @@ bool LicenseVerify()
       return false;
      }
 
-   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.20\",\"telemetry\":{\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
-                              account, device, BuildNonce(), AccountInfoDouble(ACCOUNT_BALANCE),
+   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.20\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
+                              account, device, BuildNonce(), (long)InpMagicNumber, AccountInfoDouble(ACCOUNT_BALANCE),
                               AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_MARGIN_FREE),
                               PositionsTotal(), DealsToday(), _Symbol, AccountInfoString(ACCOUNT_COMPANY));
    char post[];

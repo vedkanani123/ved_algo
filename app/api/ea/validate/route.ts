@@ -12,6 +12,7 @@ const requestSchema = z.object({
   nonce: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
   eaVersion: z.string().min(1).max(40),
   telemetry: z.object({
+    magicNumber: z.number().int().positive().max(9000000000000000).optional(),
     balance: z.number().finite().optional(),
     equity: z.number().finite().optional(),
     freeMargin: z.number().finite().optional(),
@@ -38,7 +39,16 @@ export async function POST(request: Request) {
           p_ea_version: body.eaVersion,
           p_telemetry: body.telemetry
         })
-      : await admin.rpc("validate_ea_license_by_account", {
+      : body.telemetry.magicNumber
+        ? await admin.rpc("validate_ea_license_by_activation", {
+          p_activation_magic: body.telemetry.magicNumber,
+          p_account_number: body.accountNumber,
+          p_device_fingerprint: body.deviceFingerprint,
+          p_nonce: body.nonce,
+          p_ea_version: body.eaVersion,
+          p_telemetry: body.telemetry
+        })
+        : await admin.rpc("validate_ea_license_by_account", {
           p_account_number: body.accountNumber,
           p_device_fingerprint: body.deviceFingerprint,
           p_nonce: body.nonce,

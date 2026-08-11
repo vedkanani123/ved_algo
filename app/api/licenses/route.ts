@@ -6,7 +6,7 @@ import { issueLicense } from "@/lib/licenses";
 const issueSchema = z.object({
   label: z.string().trim().min(1).max(120),
   expiresAt: z.string().datetime({ offset: true }),
-  allowedAccount: z.string().regex(/^\d{1,18}$/)
+  allowedAccount: z.string().regex(/^\d{1,18}$/).nullable().optional()
 }).refine((data) => new Date(data.expiresAt).getTime() > Date.now(), { message: "Expiry must be in the future", path: ["expiresAt"] });
 
 export async function POST(request: Request) {
