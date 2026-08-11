@@ -127,10 +127,7 @@ int OnInit()
    if(!MQLInfoInteger(MQL_TESTER))
      {
       if(!LicenseVerify())
-        {
-         Print("Gann PRO: live license authorization failed. Add the API domain to MT5 WebRequest allowed URLs.");
-         return INIT_FAILED;
-        }
+         Print("Gann PRO: waiting for live license authorization. Add https://ved-algo.vercel.app to MT5 WebRequest allowed URLs; the EA will retry automatically.");
       EventSetTimer(60);
      }
 
@@ -199,7 +196,9 @@ void OnTick()
 void OnTimer()
   {
    if(MQLInfoInteger(MQL_TESTER)) return;
-   int interval = LICENSE_HEARTBEAT_MINUTES * 60;
+   // Retry every minute until the chart is authorized (for example while the
+   // owner is adding the WebRequest origin), then use the normal heartbeat.
+   int interval = g_licenseAuthorized ? LICENSE_HEARTBEAT_MINUTES * 60 : 60;
    if((TimeCurrent() - g_licenseLastCheck) >= interval)
       LicenseVerify();
   }
