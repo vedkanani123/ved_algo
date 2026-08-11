@@ -111,6 +111,75 @@ export async function actionLicense(actorId: string, id: string, action: "extend
   await audit(actorId, data.id, `license.${action}`, action === "extend" ? { expiresAt } : {});
 }
 
+export type UpdateLicenseInput = {
+  label: string;
+  expiresAt: string;
+  allowedAccount: string;
+};
+
+/**
+ * Update the owner-editable portion of a license record. Account changes are
+ * deliberately treated as a new trust boundary: the previous terminal
+ * fingerprint is cleared so the newly assigned account can bind once.
+ */
+export async function updateLicense(actorId: string, id: string, input: UpdateLicenseInput) {
+  const admin = createAdminClient();
+  const { data: current, error: currentError } = await admin
+    .from("ea_licenses")
+    .select("id, customer_label, expires_at, allowed_account, bound_device_fingerprint")
+    .eq("id", id)
+    .single();
+  if (currentError) throw currentError;
+
+  const previousAccount = current.allowed_account == null ? null : String(current.allowed_account);
+  const accountChanged = previousAccount !== input.allowedAccount;
+  const update = {
+    customer_label: input.label,
+    expires_at: input.expiresAt,
+    allowed_account: Number(input.allowedAccount),
+    ...(accountChanged ? { bound_device_fingerprint: null, last_seen_at: null } : {})
+  };
+  const { data, error } = await admin
+    .from("ea_licenses")
+    .update(update)
+    .eq("id", id)
+    .select("id, customer_label, expires_at, allowed_account, bound_device_fingerprint, status")
+    .single();
+  if (error) throw error;
+  await audit(actorId, id, "license.updated", {
+    previousLabel: current.customer_label,
+    label: input.label,
+    previousExpiresAt: current.expires_at,
+    expiresAt: input.expiresAt,
+    previousAccount,
+    allowedAccount: input.allowedAccount,
+    deviceBindingReset: accountChanged
+  });
+  return { ...data, deviceBindingReset: accountChanged };
+}
+
+/** Permanently remove a license while retaining a deletion audit event. */
+export async function deleteLicense(actorId: string, id: string) {
+  const admin = createAdminClient();
+  const { data: current, error: currentError } = await admin
+    .from("ea_licenses")
+    .select("id, customer_label, allowed_account, status")
+    .eq("id", id)
+    .single();
+  if (currentError) throw currentError;
+
+  // ea_audit_log.license_id is ON DELETE SET NULL, so this record remains in
+  // the append-only ledger after the license row is removed.
+  await audit(actorId, id, "license.deleted", {
+    customerLabel: current.customer_label,
+    allowedAccount: current.allowed_account,
+    previousStatus: current.status
+  });
+  const { error } = await admin.from("ea_licenses").delete().eq("id", id);
+  if (error) throw error;
+  return { id };
+}
+
 export function setFile({ licenseKey, apiUrl }: { licenseKey: string; apiUrl: string }) {
   // The EA deliberately has no license input: anything in an MT5 .set file is readable by
   // its recipient. The server binds the license record to the account and terminal fingerprint.

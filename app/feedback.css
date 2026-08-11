@@ -1,1 +1,8 @@
 .toast{display:flex;align-items:center;gap:9px;position:relative;margin:14px 0 0;padding:11px 13px 11px 15px;border:1px solid rgba(130,245,196,.32);background:rgba(130,245,196,.075);color:#dff9ec;font:11px/1.45 var(--mono);letter-spacing:.01em}.toast:before{content:"";width:2px;align-self:stretch;margin-left:-15px;background:var(--mint);box-shadow:0 0 12px rgba(130,245,196,.8)}.toast:after{content:"✓";color:var(--mint);font:700 14px var(--ui)}.key-locked{color:var(--amber);font:10px var(--mono);letter-spacing:.05em;text-transform:uppercase}.mfa-qr{width:72px;height:72px;margin:0 0 0 auto;background:#fff;padding:4px;image-rendering:auto}
+.action-cell a{color:var(--mint);font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.action-cell a:hover{text-decoration:underline;text-underline-offset:4px}
+.confirmation__warning{display:block;margin-top:12px;color:#f5b6bb;font-size:11px;line-height:1.45}
+.edit-record-form{display:grid;gap:2px}
+.edit-record-form .inline-error,.edit-record-form .toast{margin-top:14px}
+@media(max-width:580px){.danger-zone__actions .button{width:100%}.action-cell a{font-size:9px}}
+@media(max-width:580px){.data-table th:nth-child(4),.data-table td:nth-child(4),.data-table th:nth-child(6),.data-table td:nth-child(6){display:none}.data-table th:nth-child(5),.data-table td:nth-child(5){display:table-cell}}
