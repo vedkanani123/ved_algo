@@ -44,6 +44,7 @@ export function MfaGate({ verified }: { verified: boolean }) {
   const [code, setCode] = useState('');
   const [factorId, setFactorId] = useState('');
   const [qrCode, setQrCode] = useState('');
+  const [existingFactor, setExistingFactor] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function beginEnrollment() {
@@ -52,7 +53,7 @@ export function MfaGate({ verified }: { verified: boolean }) {
     const result = await response.json().catch(() => null);
     setBusy(false);
     if (!response.ok || !result?.factorId) return setError(result?.error || 'MFA enrollment could not be prepared. Try again.');
-    setFactorId(result.factorId); setQrCode(result.qrCode || '');
+    setFactorId(result.factorId); setQrCode(result.qrCode || ''); setExistingFactor(Boolean(result.existing));
   }
   async function verifyCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,7 +69,7 @@ export function MfaGate({ verified }: { verified: boolean }) {
   if (verified) return <div className="mfa-state mfa-state--verified"><span>✓</span><div><strong>MFA verified</strong><small>This session may view restricted license material.</small></div></div>;
   return <section className="mfa-state" aria-label="MFA verification">
     <span>⌁</span><div><strong>Restricted materials</strong><small>Server MFA assurance is required before this response includes a full license key.</small></div>
-    {!factorId ? <button className="button button--small" type="button" onClick={beginEnrollment} disabled={busy}>{busy ? 'Preparing…' : 'Prepare MFA'}</button> : <><form onSubmit={verifyCode}><label className="sr-only" htmlFor="mfa-code">Authenticator code</label><input id="mfa-code" inputMode="numeric" maxLength={6} placeholder="000000" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} /><button className="button button--small" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Verify'}</button></form>{qrCode && <img className="mfa-qr" src={qrCode} alt="Scan this code with your authenticator app" />}</>}
+    {!factorId ? <button className="button button--small" type="button" onClick={beginEnrollment} disabled={busy}>{busy ? 'Preparing…' : 'Prepare MFA'}</button> : <><form onSubmit={verifyCode}><label className="sr-only" htmlFor="mfa-code">Authenticator code</label><input id="mfa-code" inputMode="numeric" maxLength={6} placeholder="000000" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} /><button className="button button--small" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Verify'}</button></form>{existingFactor && <p className="inline-error">Use the 6-digit code from your existing authenticator app.</p>}{qrCode && <img className="mfa-qr" src={qrCode} alt="Scan this code with your authenticator app" />}</>}
     {error && <p className="inline-error" role="alert">{error}</p>}
   </section>;
 }
