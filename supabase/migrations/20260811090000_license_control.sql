@@ -1,0 +1,4 @@
+-- Intentionally retained as a no-op migration identifier.
+-- The project already contained unrelated license tables before this application was introduced.
+-- All EA licensing tables are created under the `ea_` prefix in
+-- 20260811120000_create_ea_license_tables.sql to prevent cross-application interference.

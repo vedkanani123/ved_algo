@@ -1,0 +1,2 @@
+-- No-op: superseded by public.validate_ea_license in
+-- 20260811120000_create_ea_license_tables.sql.

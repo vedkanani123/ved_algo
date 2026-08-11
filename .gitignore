@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.set
+*.ex5
+*.log
+coverage/
+tsconfig.tsbuildinfo
+supabase/.temp/

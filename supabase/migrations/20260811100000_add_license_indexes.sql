@@ -1,0 +1,1 @@
+-- No-op: superseded by the prefixed indexes in 20260811120000_create_ea_license_tables.sql.
