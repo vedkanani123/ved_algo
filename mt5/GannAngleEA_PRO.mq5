@@ -116,6 +116,10 @@ bool     g_licenseAuthorized = false;
 datetime g_licenseLastGood   = 0;
 datetime g_licenseLastCheck  = 0;
 int      g_licenseGraceSecs  = 12 * 60 * 60;
+bool     g_strategyReady     = false;
+bool     g_volumePlanValid   = true;
+datetime g_lastOrderAttempt  = 0;
+int      g_orderRetrySecs    = 5;
 
 int g_dailyBias = 0;
 
@@ -124,6 +128,22 @@ bool IsTesterMode()
    return MQLInfoInteger(MQL_TESTER) ||
           MQLInfoInteger(MQL_OPTIMIZATION) ||
           MQLInfoInteger(MQL_FORWARD);
+  }
+
+bool InitializeStrategy()
+  {
+   if(g_strategyReady) return true;
+
+   datetime day = iTime(_Symbol, PERIOD_D1, 0);
+   if(day <= 0) return false;
+   if(!CalculateDailyLevels()) return false;
+
+   g_dayTime = day;
+   g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+   g_volumePlanValid = ValidateVolumePlan();
+   RecoverCurrentState();
+   g_strategyReady = true;
+   return true;
   }
 
 //--------------------------------------------------------------------
@@ -146,18 +166,8 @@ int OnInit()
    SetBestFillingMode();
    UpdateSymbolCache();
 
-   g_dayTime = iTime(_Symbol, PERIOD_D1, 0);
-
-   if(g_dayTime <= 0)
-      return INIT_FAILED;
-
-   g_dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
-
-   CalculateDailyLevels();
-   RecoverCurrentState();
-
-   if(!HasOurPosition() && !HasOurPendingOrders())
-      CreateDailyOrders();
+   if(!InitializeStrategy())
+      Print("Gann PRO: waiting for the first valid market data tick before strategy initialization.");
 
    return INIT_SUCCEEDED;
   }
@@ -167,17 +177,12 @@ int OnInit()
 //--------------------------------------------------------------------
 void OnTick()
   {
-   if(!IsTesterMode() && !LicenseCanTrade())
-     {
-      // Never open new trades without current authorization. Existing positions are left untouched
-      // so that a license/network change cannot unexpectedly close a customer's market exposure.
-      DeleteAllOurPendingOrders();
-      return;
-     }
+   bool authorized = IsTesterMode() || LicenseCanTrade();
+   if(!InitializeStrategy()) return;
 
    datetime nowDay = iTime(_Symbol, PERIOD_D1, 0);
 
-   if(nowDay > 0 && nowDay != g_dayTime)
+   if(authorized && nowDay > 0 && nowDay != g_dayTime)
      {
       g_dayTime = nowDay;
       StartNewTradingDay();
@@ -196,6 +201,15 @@ void OnTick()
      ManageOCO();
 
    ManageOpenPosition(tick);
+
+   if(!authorized)
+     {
+      DeleteAllOurPendingOrders();
+      return;
+     }
+
+   if(!HasOurPosition())
+      CreateDailyOrders();
   }
 
 //--------------------------------------------------------------------
@@ -284,7 +298,16 @@ int DealsToday()
   {
    datetime start = iTime(_Symbol, PERIOD_D1, 0);
    if(start <= 0 || !HistorySelect(start, TimeCurrent())) return 0;
-   return HistoryDealsTotal();
+   int count = 0;
+   for(int i = 0; i < HistoryDealsTotal(); i++)
+     {
+      ulong deal = HistoryDealGetTicket(i);
+      if(deal == 0) continue;
+      if(HistoryDealGetString(deal, DEAL_SYMBOL) != _Symbol) continue;
+      if((ulong)HistoryDealGetInteger(deal, DEAL_MAGIC) != InpMagicNumber) continue;
+      count++;
+     }
+   return count;
   }
 
 ulong Fnv1a64(const string value, const ulong seed)
@@ -517,9 +540,14 @@ double CalculateATR(MqlRates &rates[])
 void CreateDailyOrders()
   {
    if(g_tradingBlocked) return;
+   if(!g_volumePlanValid) return;
    if(InpOneTradePerDay && g_tradeTriggeredToday) return;
    if(HasOurPosition()) return;
    if(!SpreadAllowed()) return;
+
+   datetime now = TimeCurrent();
+   if(g_lastOrderAttempt > 0 && now - g_lastOrderAttempt < g_orderRetrySecs) return;
+   g_lastOrderAttempt = now;
 
    MqlTick tick;
    if(!SymbolInfoTick(_Symbol, tick)) return;
@@ -537,26 +565,30 @@ void CreateDailyOrders()
      }
 
    // BUY STOP
-   if(allowBuy && Bat > tick.ask)
+   if(allowBuy && !HasOurPendingOrderType(ORDER_TYPE_BUY_STOP) && Bat > tick.ask)
      {
       double entry = NormalizeDouble(Bat, _Digits);
       double sl    = NormalizeDouble(Bsl, _Digits);
 
       if(IsValidBuyStop(entry, sl, tick))
         {
-         trade.BuyStop(lot, entry, _Symbol, sl, 0.0, ORDER_TIME_DAY, 0, "GANN_PRO_BUY");
+         if(!trade.BuyStop(lot, entry, _Symbol, sl, 0.0, ORDER_TIME_DAY, 0, "GANN_PRO_BUY") ||
+            !TradeRequestSucceeded())
+            PrintFormat("Gann PRO: Buy Stop failed (%u) %s", trade.ResultRetcode(), trade.ResultRetcodeDescription());
         }
      }
 
    // SELL STOP
-   if(allowSell && Sat < tick.bid)
+   if(allowSell && !HasOurPendingOrderType(ORDER_TYPE_SELL_STOP) && Sat < tick.bid)
      {
       double entry = NormalizeDouble(Sat, _Digits);
       double sl    = NormalizeDouble(Ssl, _Digits);
 
       if(IsValidSellStop(entry, sl, tick))
         {
-         trade.SellStop(lot, entry, _Symbol, sl, 0.0, ORDER_TIME_DAY, 0, "GANN_PRO_SELL");
+         if(!trade.SellStop(lot, entry, _Symbol, sl, 0.0, ORDER_TIME_DAY, 0, "GANN_PRO_SELL") ||
+            !TradeRequestSucceeded())
+            PrintFormat("Gann PRO: Sell Stop failed (%u) %s", trade.ResultRetcode(), trade.ResultRetcodeDescription());
         }
      }
   }
@@ -602,7 +634,12 @@ void ManageOpenPosition(const MqlTick &tick)
            }
          else
            {
-            g_buyTP1Hit = true;
+            // The broker cannot execute the requested partial volume (for
+            // example, a 0.10 minimum lot with a 50% TP1). Close the
+            // remaining position at the target rather than claiming TP1
+            // completed while leaving risk unmanaged.
+            if(ClosePartial(ticket, volume))
+               g_buyTP1Hit = true;
            }
         }
 
@@ -620,7 +657,8 @@ void ManageOpenPosition(const MqlTick &tick)
            }
          else
            {
-            g_buyTP2Hit = true;
+            if(ClosePartial(ticket, volume))
+               g_buyTP2Hit = true;
            }
 
          if(g_buyTP2Hit)
@@ -671,7 +709,8 @@ void ManageOpenPosition(const MqlTick &tick)
            }
          else
            {
-            g_sellTP1Hit = true;
+            if(ClosePartial(ticket, volume))
+               g_sellTP1Hit = true;
            }
         }
 
@@ -689,7 +728,8 @@ void ManageOpenPosition(const MqlTick &tick)
            }
          else
            {
-            g_sellTP2Hit = true;
+            if(ClosePartial(ticket, volume))
+               g_sellTP2Hit = true;
            }
 
          if(g_sellTP2Hit)
@@ -848,6 +888,26 @@ double NormalizePartialVolume(double desired, double currentVolume)
    return NormalizeDouble(desired, g_volDigits);
   }
 
+bool ValidateVolumePlan()
+  {
+   double original = NormalizeOpeningVolume(InpLotSize);
+   if(original <= 0.0) return false;
+
+   double firstClose = NormalizePartialVolume(original * InpTP1ClosePercent / 100.0, original);
+   double afterFirst = original - firstClose;
+   double secondClose = NormalizePartialVolume(original * InpTP2ClosePercent / 100.0, afterFirst);
+   double afterSecond = afterFirst - secondClose;
+   double tolerance = MathMax(g_lotStep * 0.51, 0.0000001);
+
+   if(firstClose <= 0.0 || secondClose <= 0.0 || afterSecond < g_minLot - tolerance)
+     {
+      PrintFormat("Gann PRO: lot plan is not executable (lot=%.4f, TP1=%.4f, TP2=%.4f, runner=%.4f, min=%.4f, step=%.4f)",
+                  original, firstClose, secondClose, afterSecond, g_minLot, g_lotStep);
+      return false;
+     }
+   return true;
+  }
+
 //--------------------------------------------------------------------
 // POSITION FINDER (O(1) Cached)
 //--------------------------------------------------------------------
@@ -905,6 +965,27 @@ bool HasOurPendingOrders()
      }
 
    return false;
+  }
+
+bool HasOurPendingOrderType(ENUM_ORDER_TYPE wanted)
+  {
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket == 0) continue;
+      if(OrderGetString(ORDER_SYMBOL) != _Symbol) continue;
+      if((ulong)OrderGetInteger(ORDER_MAGIC) != InpMagicNumber) continue;
+      if((ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE) == wanted) return true;
+     }
+   return false;
+  }
+
+bool TradeRequestSucceeded()
+  {
+   uint retcode = trade.ResultRetcode();
+   return retcode == TRADE_RETCODE_DONE ||
+          retcode == TRADE_RETCODE_PLACED ||
+          retcode == TRADE_RETCODE_DONE_PARTIAL;
   }
 
 //--------------------------------------------------------------------

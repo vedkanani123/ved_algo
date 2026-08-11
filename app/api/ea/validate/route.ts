@@ -30,31 +30,27 @@ export async function POST(request: Request) {
     const body = requestSchema.parse(await request.json());
     const licenseKey = request.headers.get("x-license-key")?.trim() ?? "";
     const admin = createAdminClient();
-    const rpcResult = /^GANN-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/.test(licenseKey)
+    const hasLegacyKey = /^GANN-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/.test(licenseKey);
+    if (!hasLegacyKey && body.telemetry.magicNumber === undefined) {
+      return noStoreJson({ authorized: false, reason: "activation required" }, { status: 403 });
+    }
+    const rpcResult = hasLegacyKey
       ? await admin.rpc("validate_ea_license", {
-          p_key_fingerprint: fingerprint(licenseKey),
-          p_account_number: body.accountNumber,
-          p_device_fingerprint: body.deviceFingerprint,
-          p_nonce: body.nonce,
-          p_ea_version: body.eaVersion,
-          p_telemetry: body.telemetry
-        })
-      : body.telemetry.magicNumber
-        ? await admin.rpc("validate_ea_license_by_activation", {
-          p_activation_magic: body.telemetry.magicNumber,
-          p_account_number: body.accountNumber,
-          p_device_fingerprint: body.deviceFingerprint,
-          p_nonce: body.nonce,
-          p_ea_version: body.eaVersion,
-          p_telemetry: body.telemetry
-        })
-        : await admin.rpc("validate_ea_license_by_account", {
-          p_account_number: body.accountNumber,
-          p_device_fingerprint: body.deviceFingerprint,
-          p_nonce: body.nonce,
-          p_ea_version: body.eaVersion,
-          p_telemetry: body.telemetry
-        });
+        p_key_fingerprint: fingerprint(licenseKey),
+        p_account_number: body.accountNumber,
+        p_device_fingerprint: body.deviceFingerprint,
+        p_nonce: body.nonce,
+        p_ea_version: body.eaVersion,
+        p_telemetry: body.telemetry
+      })
+      : await admin.rpc("validate_ea_license_by_activation", {
+        p_activation_magic: body.telemetry.magicNumber!,
+        p_account_number: body.accountNumber,
+        p_device_fingerprint: body.deviceFingerprint,
+        p_nonce: body.nonce,
+        p_ea_version: body.eaVersion,
+        p_telemetry: body.telemetry
+      });
     const { data, error } = rpcResult;
     if (error) throw error;
     const row = data?.[0];
