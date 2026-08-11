@@ -118,7 +118,8 @@ export function setFile({ licenseKey, apiUrl }: { licenseKey: string; apiUrl: st
   void licenseKey;
   return [
     "; Gann PRO account-bound activation package",
-    "; This file contains no license secret. In MT5 set only InpMagicNumber.",
+    "; This file contains no license secret. The only EA input is InpMagicNumber.",
+    "InpMagicNumber=888123",
     `; WebRequest endpoint: ${apiUrl}`,
     "; The owner must bind this license to the recipient's MT5 account in the dashboard."
   ].join("\r\n");
