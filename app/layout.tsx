@@ -6,6 +6,7 @@ import './feedback.css';
 export const metadata: Metadata = {
   title: 'Algo License Console',
   description: 'Private owner console for MetaTrader EA licenses.',
+  icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
