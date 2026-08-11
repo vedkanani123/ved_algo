@@ -227,8 +227,16 @@ bool LicenseVerify()
       return false;
      }
 
+   string nonce = BuildNonce();
+   if(StringLen(device) != 64 || StringLen(nonce) != 32)
+     {
+      g_licenseAuthorized = false;
+      PrintFormat("Gann PRO: invalid handshake identifiers (device=%d, nonce=%d)", StringLen(device), StringLen(nonce));
+      return false;
+     }
+
    string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.21\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
-                              account, device, BuildNonce(), (long)InpMagicNumber, AccountInfoDouble(ACCOUNT_BALANCE),
+                              account, device, nonce, (long)InpMagicNumber, AccountInfoDouble(ACCOUNT_BALANCE),
                               AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_MARGIN_FREE),
                               PositionsTotal(), DealsToday(), _Symbol, AccountInfoString(ACCOUNT_COMPANY));
    char post[];
