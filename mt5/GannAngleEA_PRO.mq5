@@ -17,7 +17,7 @@
 //| - Break-even protection & daily trend/regime filters             |
 //+------------------------------------------------------------------+
 #property copyright "Gann PRO"
-#property version   "2.20"
+#property version   "2.21"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -227,7 +227,7 @@ bool LicenseVerify()
       return false;
      }
 
-   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.20\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
+   string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.21\",\"telemetry\":{\"magicNumber\":%I64d,\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
                               account, device, BuildNonce(), (long)InpMagicNumber, AccountInfoDouble(ACCOUNT_BALANCE),
                               AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_MARGIN_FREE),
                               PositionsTotal(), DealsToday(), _Symbol, AccountInfoString(ACCOUNT_COMPANY));
@@ -280,7 +280,10 @@ ulong Fnv1a64(const string value, const ulong seed)
 string HashPart(const string value, const ulong seed)
   {
    string part = StringFormat("%016I64X", Fnv1a64(value, seed));
-   return StringToLower(part);
+   // StringToLower mutates the string and returns bool; returning its result
+   // would send "1"/"0" instead of the required 16-character hex segment.
+   StringToLower(part);
+   return part;
   }
 
 string BuildDeviceFingerprint()
