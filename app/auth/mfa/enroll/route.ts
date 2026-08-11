@@ -13,6 +13,8 @@ export async function POST() {
     if (existing) return noStoreJson({ factorId: existing.id, qrCode: null, existing: true });
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Gann PRO License" });
     if (error) throw error;
-    return noStoreJson({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });
+    // The QR payload already contains the shared secret needed by an authenticator.
+    // Do not also serialize that secret into a JSON response or browser state.
+    return noStoreJson({ factorId: data.id, qrCode: data.totp.qr_code, existing: false });
   } catch (error) { return apiError(error); }
 }
