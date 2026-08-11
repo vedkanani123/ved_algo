@@ -17,7 +17,7 @@
 //| - Break-even protection & daily trend/regime filters             |
 //+------------------------------------------------------------------+
 #property copyright "Gann PRO"
-#property version   "2.10"
+#property version   "2.20"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -39,45 +39,39 @@ enum ENUM_DAILY_CLOSE_MODE
 //--------------------------------------------------------------------
 // INPUTS
 //--------------------------------------------------------------------
-input group "=== SECURE LIVE LICENSE ==="
-input string         InpLicenseKey              = "";
-input string         InpLicenseApiUrl           = "https://licenses.example.com/api/ea/validate";
-input int            InpLicenseHeartbeatMinutes = 15;
+// No license secret is distributed to the terminal. Authorization is account/device bound
+// by the HTTPS API, so a readable .set file cannot be used to copy an activation.
+const string LICENSE_API_URL = "https://ved-algo.vercel.app/api/ea/validate";
+const int    LICENSE_HEARTBEAT_MINUTES = 15;
 
-input group "=== MAIN STRATEGY ==="
-input ENUM_CALC_BASE InpCalcBase       = CALC_TODAY_OPEN;
-input double         InpLotSize        = 0.10;
+// This is the only value exposed in the MT5 Inputs dialog.
+const ENUM_CALC_BASE InpCalcBase       = CALC_TODAY_OPEN;
+const double         InpLotSize        = 0.10;
 input ulong          InpMagicNumber    = 888123;
-input ulong          InpSlippage       = 10;
+const ulong          InpSlippage       = 10;
 
-input group "=== GANN MANAGEMENT ==="
-input double InpTP1ClosePercent = 50.0;
-input double InpTP2ClosePercent = 30.0;
-input bool   InpBreakEvenAtTP1  = true;
-input double InpBEExtraPoints   = 0.0;
-input bool   InpUseLevelTrail   = true;
+const double InpTP1ClosePercent = 50.0;
+const double InpTP2ClosePercent = 30.0;
+const bool   InpBreakEvenAtTP1  = true;
+const double InpBEExtraPoints   = 0.0;
+const bool   InpUseLevelTrail   = true;
 
-input group "=== FALSE BREAKOUT PROTECTION ==="
-input bool   InpUseOCO             = true;
-input bool   InpOneTradePerDay     = true;
-input bool   InpUseTrendBias       = true;
-input int    InpTrendPeriod        = 10;
-input double InpTrendDeadZoneATR   = 0.05;
+const bool   InpUseOCO             = true;
+const bool   InpOneTradePerDay     = true;
+const bool   InpUseTrendBias       = true;
+const int    InpTrendPeriod        = 10;
+const double InpTrendDeadZoneATR   = 0.05;
 
-input group "=== MARKET REGIME FILTER ==="
-input bool   InpUseRegimeFilter    = true;
-input int    InpATRPeriod          = 14;
-input double InpMinRangeATR        = 0.55;
-input double InpMaxRangeATR        = 2.80;
+const bool   InpUseRegimeFilter    = true;
+const int    InpATRPeriod          = 14;
+const double InpMinRangeATR        = 0.55;
+const double InpMaxRangeATR        = 2.80;
 
-input group "=== OPTIONAL EXECUTION FILTER ==="
-input double InpMaxSpreadPoints    = 0.0;
+const double InpMaxSpreadPoints    = 0.0;
 
-input group "=== OPTIONAL EQUITY PROTECTION ==="
-input double InpMaxDayEquityLossPc = 0.0;
+const double InpMaxDayEquityLossPc = 0.0;
 
-input group "=== DAY CHANGE ==="
-input ENUM_DAILY_CLOSE_MODE InpDayCloseMode = CLOSE_ALL_NEW_DAY;
+const ENUM_DAILY_CLOSE_MODE InpDayCloseMode = CLOSE_ALL_NEW_DAY;
 
 //--------------------------------------------------------------------
 // GLOBALS & CACHED SYMBOL SPECS
@@ -205,7 +199,7 @@ void OnTick()
 void OnTimer()
   {
    if(MQLInfoInteger(MQL_TESTER)) return;
-   int interval = MathMax(1, InpLicenseHeartbeatMinutes) * 60;
+   int interval = LICENSE_HEARTBEAT_MINUTES * 60;
    if((TimeCurrent() - g_licenseLastCheck) >= interval)
       LicenseVerify();
   }
@@ -226,14 +220,14 @@ bool LicenseCanTrade()
 bool LicenseVerify()
   {
    g_licenseLastCheck = TimeCurrent();
-   if(StringLen(InpLicenseKey) < 20 || StringFind(InpLicenseApiUrl, "https://") != 0)
+   string device = BuildDeviceFingerprint();
+   long account  = AccountInfoInteger(ACCOUNT_LOGIN);
+   if(account <= 0 || StringFind(LICENSE_API_URL, "https://") != 0)
      {
       g_licenseAuthorized = false;
       return false;
      }
 
-   string device = BuildDeviceFingerprint();
-   long account  = AccountInfoInteger(ACCOUNT_LOGIN);
    string json = StringFormat("{\"accountNumber\":%I64d,\"deviceFingerprint\":\"%s\",\"nonce\":\"%s\",\"eaVersion\":\"2.20\",\"telemetry\":{\"balance\":%.2f,\"equity\":%.2f,\"freeMargin\":%.2f,\"openPositions\":%d,\"dealsToday\":%d,\"symbol\":\"%s\",\"broker\":\"%s\"}}",
                               account, device, BuildNonce(), AccountInfoDouble(ACCOUNT_BALANCE),
                               AccountInfoDouble(ACCOUNT_EQUITY), AccountInfoDouble(ACCOUNT_MARGIN_FREE),
@@ -243,9 +237,9 @@ bool LicenseVerify()
    if(size > 0) ArrayResize(post, size - 1);
    char response[];
    string responseHeaders;
-   string headers = "Content-Type: application/json\r\nX-License-Key: " + InpLicenseKey + "\r\n";
+   string headers = "Content-Type: application/json\r\nAccept: application/json\r\n";
    ResetLastError();
-   int code = WebRequest("POST", InpLicenseApiUrl, headers, 8000, post, response, responseHeaders);
+   int code = WebRequest("POST", LICENSE_API_URL, headers, 8000, post, response, responseHeaders);
    if(code == -1)
      {
       PrintFormat("Gann PRO license transport unavailable (%d)", GetLastError());

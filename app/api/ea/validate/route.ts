@@ -7,7 +7,7 @@ import { withinRateLimit } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 
 const requestSchema = z.object({
-  accountNumber: z.coerce.number().int().nonnegative(),
+  accountNumber: z.coerce.number().int().positive(),
   deviceFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   nonce: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
   eaVersion: z.string().min(1).max(40),
@@ -25,30 +25,37 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? request.headers.get("x-real-ip") ?? "unknown";
   if (!withinRateLimit(`ea:${forwarded}`)) return noStoreJson({ authorized: false, reason: "rate limited" }, { status: 429 });
-  const licenseKey = request.headers.get("x-license-key");
-  if (!licenseKey || !/^GANN-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/.test(licenseKey)) {
-    return noStoreJson({ authorized: false, reason: "invalid license" }, { status: 401 });
-  }
   try {
     const body = requestSchema.parse(await request.json());
-    const { data, error } = await createAdminClient().rpc("validate_ea_license", {
-      p_key_fingerprint: fingerprint(licenseKey),
-      p_account_number: body.accountNumber,
-      p_device_fingerprint: body.deviceFingerprint,
-      p_nonce: body.nonce,
-      p_ea_version: body.eaVersion,
-      p_telemetry: body.telemetry
-    });
+    const licenseKey = request.headers.get("x-license-key")?.trim() ?? "";
+    const admin = createAdminClient();
+    const rpcResult = /^GANN-(?:[A-F0-9]{5}-){3}[A-F0-9]{5}$/.test(licenseKey)
+      ? await admin.rpc("validate_ea_license", {
+          p_key_fingerprint: fingerprint(licenseKey),
+          p_account_number: body.accountNumber,
+          p_device_fingerprint: body.deviceFingerprint,
+          p_nonce: body.nonce,
+          p_ea_version: body.eaVersion,
+          p_telemetry: body.telemetry
+        })
+      : await admin.rpc("validate_ea_license_by_account", {
+          p_account_number: body.accountNumber,
+          p_device_fingerprint: body.deviceFingerprint,
+          p_nonce: body.nonce,
+          p_ea_version: body.eaVersion,
+          p_telemetry: body.telemetry
+        });
+    const { data, error } = rpcResult;
     if (error) throw error;
-    const result = data?.[0];
-    if (!result) throw new Error("No license result");
+    const row = data?.[0];
+    if (!row) throw new Error("No license result");
     return noStoreJson({
-      authorized: result.authorized,
-      reason: result.reason,
-      expiresAt: result.expires_at,
+      authorized: row.authorized,
+      reason: row.reason,
+      expiresAt: row.expires_at,
       heartbeatMinutes: 15,
       offlineGraceMinutes: 720
-    }, { status: result.authorized ? 200 : 403 });
+    }, { status: row.authorized ? 200 : 403 });
   } catch (error) {
     console.error("EA validation failed", error);
     return noStoreJson({ authorized: false, reason: "validation unavailable" }, { status: 503 });

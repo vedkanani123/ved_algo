@@ -112,12 +112,14 @@ export async function actionLicense(actorId: string, id: string, action: "extend
 }
 
 export function setFile({ licenseKey, apiUrl }: { licenseKey: string; apiUrl: string }) {
-  // MT5 .set files are intentionally simple key/value files. They cannot be both hidden from
-  // the terminal and usable by it, so access is enforced by the server, not by file secrecy.
+  // The EA deliberately has no license input: anything in an MT5 .set file is readable by
+  // its recipient. The server binds the license record to the account and terminal fingerprint.
+  // Keep the legacy licenseKey argument for route compatibility, but never serialize it.
+  void licenseKey;
   return [
-    "; Gann PRO secure activation package — do not share",
-    `InpLicenseKey=${licenseKey}`,
-    `InpLicenseApiUrl=${apiUrl}`,
-    "InpLicenseHeartbeatMinutes=15"
+    "; Gann PRO account-bound activation package",
+    "; This file contains no license secret. In MT5 set only InpMagicNumber.",
+    `; WebRequest endpoint: ${apiUrl}`,
+    "; The owner must bind this license to the recipient's MT5 account in the dashboard."
   ].join("\r\n");
 }
