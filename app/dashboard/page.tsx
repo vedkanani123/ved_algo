@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { ConsoleNav, EmptyState, LicenseStatus, type LicenseState } from '../../components/console-ui';
 import { requireOwner } from '../../lib/auth';
-import { listLicenses } from '../../lib/licenses';
+import { listLicenses, listRecentHeartbeats } from '../../lib/licenses';
 
 export default async function DashboardPage() {
   await requireOwner();
-  const licenses = await listLicenses();
+  const [licenses, heartbeats] = await Promise.all([listLicenses(), listRecentHeartbeats()]);
   const now = Date.now();
   const expiring = licenses.filter((license) => license.status === 'active' && new Date(license.expires_at).getTime() - now < 14 * 86_400_000 && new Date(license.expires_at).getTime() > now).length;
   const active = licenses.filter((license) => license.status === 'active').length;
@@ -19,6 +19,6 @@ export default async function DashboardPage() {
       <article className="stat"><span className="stat__label">Live accounts</span><strong>{live}</strong><small>last heartbeat under 24h</small></article>
     </section>
     <div className="dashboard-grid reveal delay-2"><section id="licenses"><header className="panel-header"><div><p className="eyebrow">Registry / latest activity</p><h2>License register</h2></div><Link className="panel-link" href="/licenses/new">+ Issue license</Link></header>{licenses.length === 0 ? <EmptyState title="No licenses issued">Create the first activation record when you are ready to deliver an EA.</EmptyState> : <div className="data-panel table-wrap"><table className="data-table"><thead><tr><th>Customer label</th><th>License</th><th>Trading account</th><th>Expiry</th><th>Status</th></tr></thead><tbody>{licenses.map((license) => <tr key={license.id}><td className="primary-cell"><Link href={`/licenses/${license.id}`}>{license.customer_label}</Link></td><td className="mono">{license.id.slice(0, 8)}</td><td className="mono muted">{license.allowed_account ?? 'Not bound'}</td><td className="mono">{new Date(license.expires_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td><td><LicenseStatus status={license.status as LicenseState} /></td></tr>)}</tbody></table></div>}</section>
-    <aside><header className="panel-header"><div><p className="eyebrow">Terminal wire / last 90 min</p><h2>Recent heartbeats</h2></div></header><div className="event-stream"><article className="event"><i className="event__rail" /><div><div className="event__title">Orion Quant terminal accepted</div><div className="event__detail">ACC 87234190 · WIN-8D2A</div></div><time>14:31</time></article><article className="event event--warn"><i className="event__rail" /><div><div className="event__title">Apex Trade Lab expires in 3 days</div><div className="event__detail">ALGO-A8C0 · NO BINDING</div></div><time>14:18</time></article><article className="event"><i className="event__rail" /><div><div className="event__title">Harbor Algo Desk heartbeat</div><div className="event__detail">ACC 65721104 · 0.8.1</div></div><time>13:58</time></article><article className="event event--warn"><i className="event__rail" /><div><div className="event__title">Rejected device fingerprint</div><div className="event__detail">ALGO-77E2 · NEW HARDWARE</div></div><time>13:41</time></article></div></aside></div>
+    <aside><header className="panel-header"><div><p className="eyebrow">Terminal wire / live</p><h2>Recent heartbeats</h2></div></header>{heartbeats.length === 0 ? <EmptyState title="No terminal heartbeats">Accepted EA handshakes will appear here with the account, device, and build.</EmptyState> : <div className="event-stream">{heartbeats.map((heartbeat) => { const license = licenses.find((item) => item.id === heartbeat.license_id); return <article className="event" key={heartbeat.id}><i className="event__rail" /><div><div className="event__title">{license?.customer_label ?? 'License terminal'} accepted</div><div className="event__detail">ACC {heartbeat.account_number} · {heartbeat.device_fingerprint} · {heartbeat.ea_version}</div></div><time>{new Date(heartbeat.received_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</time></article>; })}</div>}</aside></div>
   </main></div>;
 }

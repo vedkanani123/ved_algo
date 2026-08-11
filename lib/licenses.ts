@@ -85,6 +85,24 @@ export async function listLicenses() {
   return data;
 }
 
+export type RecentHeartbeat = {
+  id: number | string;
+  license_id: string;
+  received_at: string;
+  account_number: number | string;
+  device_fingerprint: string;
+  ea_version: string;
+};
+
+export async function listRecentHeartbeats() {
+  const { data, error } = await createAdminClient().from("ea_heartbeats")
+    .select("id, license_id, received_at, account_number, device_fingerprint, ea_version")
+    .order("received_at", { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data as RecentHeartbeat[];
+}
+
 export async function actionLicense(actorId: string, id: string, action: "extend" | "suspend" | "revoke", expiresAt?: string) {
   const admin = createAdminClient();
   const update = action === "extend" ? { expires_at: expiresAt, status: "active" } : { status: action === "suspend" ? "suspended" : "revoked" };
