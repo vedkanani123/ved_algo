@@ -92,11 +92,20 @@ export type RecentHeartbeat = {
   account_number: number | string;
   device_fingerprint: string;
   ea_version: string;
+  telemetry: {
+    balance?: number;
+    equity?: number;
+    freeMargin?: number;
+    openPositions?: number;
+    dealsToday?: number;
+    symbol?: string;
+    broker?: string;
+  } | null;
 };
 
 export async function listRecentHeartbeats() {
   const { data, error } = await createAdminClient().from("ea_heartbeats")
-    .select("id, license_id, received_at, account_number, device_fingerprint, ea_version")
+    .select("id, license_id, received_at, account_number, device_fingerprint, ea_version, telemetry")
     .order("received_at", { ascending: false })
     .limit(10);
   if (error) throw error;
