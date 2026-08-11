@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { ConsoleNav, DangerAction, EmptyState, ExpiryForm, LicenseKey, LicenseStatus } from '../../../components/console-ui';
 import { requireOwner } from '../../../lib/auth';
 import { getLicense } from '../../../lib/licenses';
@@ -17,7 +18,13 @@ type AuditRecord = { id: number | string; created_at: string; actor_id: string |
 export default async function LicenseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireOwner();
   const { id } = await params;
-  const license = await getLicense(id);
+  let license;
+  try {
+    license = await getLicense(id);
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'PGRST116') notFound();
+    throw error;
+  }
   const keyForResponse = license.licenseKey;
   return <div className="app-shell"><ConsoleNav active="licenses" /><main className="main"><header className="detail-header"><div><p className="eyebrow">License record / {id}</p><h1>{license.licenseKey.slice(0, 19)}</h1></div><div className="page-actions"><LicenseStatus status={license.status} /><a className="button button--amber" href={`/api/licenses/${id}/set`}>↓ Download .set</a></div></header>
     <section className="trust-strip" aria-label="Current authorization chain"><div className="trust-node"><span>01 / License</span><strong>{license.licenseKey.slice(0, 14)}</strong></div><i className="trust-link" /><div className="trust-node"><span>02 / Trading account</span><strong>{license.allowed_account ?? 'Awaiting first bind'}</strong></div><i className="trust-link" /><div className="trust-node"><span>03 / Terminal device</span><strong>{license.bound_device_fingerprint ?? 'Awaiting first bind'}</strong></div><i className="trust-link" /><div className="trust-node"><span>04 / Last heartbeat</span><strong>{license.last_seen_at ? new Date(license.last_seen_at).toLocaleString('en-IN') : 'No heartbeat received'}</strong></div></section>
