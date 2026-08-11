@@ -13,6 +13,9 @@ export async function POST(request: Request) {
   }
   const supabase = await createServerSupabase();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return NextResponse.redirect(new URL("/login?error=invalid", request.url), 303);
+  if (error) {
+    const reason = /confirm|verified/i.test(error.message) ? "confirm" : "invalid";
+    return NextResponse.redirect(new URL(`/login?error=${reason}`, request.url), 303);
+  }
   return NextResponse.redirect(new URL("/dashboard", request.url), 303);
 }
