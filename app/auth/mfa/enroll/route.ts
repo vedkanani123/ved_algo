@@ -7,6 +7,10 @@ export async function POST() {
   try {
     await requireOwnerApi({ mfa: false });
     const supabase = await createServerSupabase();
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+    if (factorsError) throw factorsError;
+    const existing = factors.totp.find((factor) => factor.status === "verified");
+    if (existing) return noStoreJson({ factorId: existing.id, qrCode: null, existing: true });
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Gann PRO License" });
     if (error) throw error;
     return noStoreJson({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });

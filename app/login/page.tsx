@@ -1,4 +1,9 @@
-export default function LoginPage() {
+import { getOwnerSession } from '../../lib/auth';
+import { MfaGate } from '../../components/console-ui';
+
+export default async function LoginPage() {
+  const owner = await getOwnerSession();
+  if (owner && !owner.mfaVerified) return <main className="login-page"><div className="login-wrap reveal"><div className="login-brand"><div className="wordmark"><span className="wordmark__mark">A</span><span>ALGO<span className="wordmark__muted">/OWNER</span></span></div><p>MetaTrader license authority</p></div><section className="login-panel" aria-labelledby="mfa-title"><p className="eyebrow">Access control / 02</p><h1 id="mfa-title">Verify your authenticator</h1><p>Your password was accepted. Complete MFA to unlock the private console.</p><MfaGate verified={false} /></section></div></main>;
   return <main className="login-page">
     <div className="login-wrap reveal">
       <div className="login-brand"><div className="wordmark"><span className="wordmark__mark">A</span><span>ALGO<span className="wordmark__muted">/OWNER</span></span></div><p>MetaTrader license authority</p></div>
