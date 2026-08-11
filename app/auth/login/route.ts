@@ -17,5 +17,5 @@ export async function POST(request: Request) {
     const reason = /confirm|verified/i.test(error.message) ? "confirm" : "invalid";
     return NextResponse.redirect(new URL(`/login?error=${reason}`, request.url), 303);
   }
-  return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  return NextResponse.redirect(new URL("/login?access=required", request.url), 303);
 }

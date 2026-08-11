@@ -16,7 +16,7 @@ export function LicenseStatus({ status }: { status: LicenseState }) {
   return <span className={`status status--${status}`}><i aria-hidden="true" />{labels[status]}</span>;
 }
 
-export function ConsoleNav({ active, mfaVerified = true }: { active: 'dashboard' | 'licenses' | 'new'; mfaVerified?: boolean }) {
+export function ConsoleNav({ active }: { active: 'dashboard' | 'licenses' | 'new' }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -32,7 +32,7 @@ export function ConsoleNav({ active, mfaVerified = true }: { active: 'dashboard'
           <Link href="/licenses/new" className={active === 'new' ? 'nav-item nav-item--active' : 'nav-item'}><span>03</span>Issue license</Link>
         </nav>
         <div className="sidebar__bottom">
-          <div className="secure-card"><span className="secure-dot" />{mfaVerified ? 'SESSION SECURED' : 'MFA REQUIRED'}<br /><small>{mfaVerified ? 'MFA VERIFIED · RESTRICTED MATERIAL ENABLED' : 'RESTRICTED MATERIAL IS MASKED'}</small></div>
+          <div className="secure-card"><span className="secure-dot" />SESSION SECURED<br /><small>OWNER ACCESS CODE VERIFIED · RESTRICTED MATERIAL ENABLED</small></div>
           <form method="post" action="/auth/logout"><button className="logout" type="submit">↗ Sign out</button></form>
         </div>
       </aside>
@@ -40,43 +40,9 @@ export function ConsoleNav({ active, mfaVerified = true }: { active: 'dashboard'
   );
 }
 
-export function MfaGate({ verified }: { verified: boolean }) {
-  const [code, setCode] = useState('');
-  const [factorId, setFactorId] = useState('');
-  const [qrCode, setQrCode] = useState('');
-  const [existingFactor, setExistingFactor] = useState(false);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function beginEnrollment() {
-    setBusy(true); setError('');
-    const response = await fetch('/auth/mfa/enroll', { method: 'POST' });
-    const result = await response.json().catch(() => null);
-    setBusy(false);
-    if (!response.ok || !result?.factorId) return setError(result?.error || 'MFA enrollment could not be prepared. Try again.');
-    setFactorId(result.factorId); setQrCode(result.qrCode || ''); setExistingFactor(Boolean(result.existing));
-  }
-  async function verifyCode(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (code.trim().length !== 6) return setError('Enter the 6-digit authenticator code.');
-    if (!factorId) return setError('Prepare MFA enrollment before submitting a code.');
-    setBusy(true); setError('');
-    const response = await fetch('/auth/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ factorId, code }) });
-    const result = await response.json().catch(() => null);
-    setBusy(false);
-    if (!response.ok || !result?.ok) return setError(result?.error || 'That authenticator code was not accepted.');
-    window.location.reload();
-  }
-  if (verified) return <div className="mfa-state mfa-state--verified"><span>✓</span><div><strong>MFA verified</strong><small>This session may view restricted license material.</small></div></div>;
-  return <section className="mfa-state" aria-label="MFA verification">
-    <span>⌁</span><div><strong>Restricted materials</strong><small>Server MFA assurance is required before this response includes a full license key.</small></div>
-    {!factorId ? <button className="button button--small" type="button" onClick={beginEnrollment} disabled={busy}>{busy ? 'Preparing…' : 'Prepare MFA'}</button> : <><form onSubmit={verifyCode}><label className="sr-only" htmlFor="mfa-code">Authenticator code</label><input id="mfa-code" inputMode="numeric" maxLength={6} placeholder="000000" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} /><button className="button button--small" type="submit" disabled={busy}>{busy ? 'Checking…' : 'Verify'}</button></form>{existingFactor && <p className="inline-error">Use the 6-digit code from your existing authenticator app.</p>}{qrCode && <img className="mfa-qr" src={qrCode} alt="Scan this code with your authenticator app" />}</>}
-    {error && <p className="inline-error" role="alert">{error}</p>}
-  </section>;
-}
-
 export function LicenseKey({ value }: { value?: string }) {
   const [revealed, setRevealed] = useState(false);
-  if (!value) return <div className="license-key"><code>ALGO-••••-••••-••••-••••</code><span className="key-locked">MFA session required</span></div>;
+  if (!value) return <div className="license-key"><code>ALGO-••••-••••-••••-••••</code><span className="key-locked">Owner access code required</span></div>;
   return <div className="license-key"><code>{revealed ? value : 'ALGO-••••-••••-••••-••••'}</code><button type="button" className="text-button" onClick={() => setRevealed(!revealed)}>{revealed ? 'Mask key' : 'Reveal verified key'}</button></div>;
 }
 

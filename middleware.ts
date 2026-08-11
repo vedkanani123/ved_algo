@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
         }
       }
     });
-    // Validates/refreshes the token before a Server Component evaluates MFA assurance.
+    // Validates/refreshes the owner session before Server Components evaluate access.
     await supabase.auth.getClaims();
   }
 
