@@ -6,7 +6,7 @@ import { serverEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 
-const schema = z.object({ password: z.string().min(12).max(128) });
+const schema = z.object({ password: z.string().min(8).max(128) });
 
 export async function POST(request: Request) {
   const token = request.headers.get("x-bootstrap-token");
