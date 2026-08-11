@@ -1,0 +1,33 @@
+# Hosted Supabase Auth configuration for the owner-only licensing console.
+project_id = "oefrwjdefqnpsubuxpmu"
+
+[auth]
+# Never generate authentication emails that point to a development machine.
+site_url = "https://ved-algo.vercel.app"
+additional_redirect_urls = ["https://ved-algo.vercel.app"]
+enable_signup = false
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits_symbols"
+
+[auth.email]
+# Keep the email provider enabled for password login. Global [auth].enable_signup above blocks new users.
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = true
+secure_password_change = true
+max_frequency = "60s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.mfa]
+max_enrolled_factors = 1
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
